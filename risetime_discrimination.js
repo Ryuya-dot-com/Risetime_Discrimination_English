@@ -10,10 +10,12 @@ const config = {
 };
 
 const practiceConfig = {
-  trials: 3,
+  trials: 5,
   baseStep: 1,
   differentStep: 100
 };
+
+const DISPLAY_LABEL = 'Listening Task 4';
 
 const elements = {
   setup: document.getElementById('setup'),
@@ -42,6 +44,7 @@ let responseWindowStart = null;
 let trialState = {};
 const results = [];
 let warmupPromise = null;
+let awaitingTestStart = false;
 
 const audioPool = initAudioPool(config.numSteps);
 const baseAudioA = createAudio('Stimuli/1.flac');
@@ -123,17 +126,16 @@ function showSection(section) {
 }
 
 function setSessionUi(mode) {
-  const tagBase = 'Step 3/4';
   if (mode === 'practice') {
-    elements.sessionTag.textContent = `${tagBase} | Practice`;
-    elements.trialHeading.textContent = 'Practice: choose the odd one';
-    elements.trialPrompt.textContent = 'These sounds are clearly different. Pick 1 or 3.';
+    elements.sessionTag.textContent = `${DISPLAY_LABEL} | Practice`;
+    elements.trialHeading.textContent = `${DISPLAY_LABEL} - Practice`;
+    elements.trialPrompt.textContent = 'The different sound is obvious. Choose 1 or 3.';
   } else {
-    elements.sessionTag.textContent = `${tagBase} | Main`;
-    elements.trialHeading.textContent = 'Make your choice';
+    elements.sessionTag.textContent = `${DISPLAY_LABEL} | Main`;
+    elements.trialHeading.textContent = `${DISPLAY_LABEL} - Main`;
     elements.trialPrompt.textContent = 'Which sound is different? (1 or 3)';
   }
-  elements.playbackStatus.textContent = 'Playing sounds...';
+  elements.playbackStatus.textContent = 'Playing audio...';
 }
 
 function clearFeedback() {
@@ -152,13 +154,16 @@ function resetPracticeProgress() {
   practiceState.order = [];
   practiceState.completed = false;
   elements.startTest.disabled = true;
+  elements.startTest.textContent = 'Start main run after practice (Space also works)';
   elements.startPractice.disabled = true;
-  elements.practiceStatus.textContent = 'Loading audio...';
+  elements.startPractice.textContent = 'Start practice';
+  elements.practiceStatus.textContent = 'Complete 5 practice trials, then start the main run via Space or the button.';
+  awaitingTestStart = false;
   warmupPromise = warmUpAudio();
   warmupPromise.finally(() => {
     elements.startPractice.disabled = false;
     if (!practiceState.completed) {
-      elements.practiceStatus.textContent = 'Please complete the practice first (uses stimuli 1 and 100).';
+      elements.practiceStatus.textContent = 'Complete 5 practice trials, then start the main run via Space or the button.';
     }
   });
 }
@@ -196,35 +201,34 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function playAndWait(audio) {
-  if (!audio) return Promise.resolve(true);
-  return waitForAudioReady(audio).then(() => {
-    resetAudio(audio);
-    return new Promise(resolve => {
-      let done = false;
-      let hadError = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        audio.removeEventListener('ended', onEnded);
-        audio.removeEventListener('error', onError);
-        resolve(hadError);
-      };
-      const onEnded = () => finish();
-      const onError = () => {
-        hadError = true;
-        finish();
-      };
-      audio.addEventListener('ended', onEnded, { once: true });
-      audio.addEventListener('error', onError, { once: true });
-      const fallbackMs = Number.isFinite(audio.duration) && audio.duration > 0
-        ? Math.round(audio.duration * 1000) + 200
-        : 4000;
-      setTimeout(finish, fallbackMs);
-      audio.play().catch(() => {
-        hadError = true;
-        finish();
-      });
+async function playAndWait(audio) {
+  if (!audio) return true;
+  await waitForAudioReady(audio);
+  resetAudio(audio);
+  return new Promise(resolve => {
+    let done = false;
+    let hadError = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
+      resolve(hadError);
+    };
+    const onEnded = () => finish();
+    const onError = () => {
+      hadError = true;
+      finish();
+    };
+    audio.addEventListener('ended', onEnded, { once: true });
+    audio.addEventListener('error', onError, { once: true });
+    const fallbackMs = Number.isFinite(audio.duration) && audio.duration > 0
+      ? Math.round(audio.duration * 1000) + 200
+      : 4000;
+    setTimeout(finish, fallbackMs);
+    audio.play().catch(() => {
+      hadError = true;
+      finish();
     });
   });
 }
@@ -241,9 +245,18 @@ async function playSequence(first, second, third) {
 }
 
 async function startExperiment() {
+  if (!practiceState.completed) {
+    elements.practiceStatus.textContent = 'Please finish practice before starting the main run.';
+    return;
+  }
+  if (!awaitingTestStart) return;
   if (warmupPromise) {
     await warmupPromise;
   }
+  awaitingTestStart = false;
+  elements.startTest.disabled = true;
+  elements.startTest.textContent = 'Preparing main run...';
+  elements.practiceStatus.textContent = 'Preparing main run...';
   state.currentStep = config.startingStep;
   state.currentTrial = 0;
   state.numReversals = 0;
@@ -263,7 +276,8 @@ function startPractice() {
   practiceState.order = buildPracticeOrder(practiceConfig.trials);
   practiceState.completed = false;
   elements.startTest.disabled = true;
-  elements.practiceStatus.textContent = 'Practice in progress. After playback, choose 1 or 3.';
+  awaitingTestStart = false;
+  elements.practiceStatus.textContent = `Practice ${practiceConfig.trials} trials total. After playback, choose 1 or 3.`;
   setSessionUi('practice');
   clearFeedback();
   showSection('trial');
@@ -280,7 +294,7 @@ async function runPracticeTrial() {
   const correctAnswer = oddIsThird ? '3' : '1';
 
   toggleResponseButtons(false);
-  elements.playbackStatus.textContent = `Practice ${trialIndex + 1}/${practiceConfig.trials}: Playing sounds...`;
+  elements.playbackStatus.textContent = `Practice ${trialIndex + 1}/${practiceConfig.trials}: Playing audio...`;
 
   const differentAudio = audioPool[practiceConfig.differentStep];
   const first = oddIsThird ? baseAudioA : differentAudio;
@@ -290,7 +304,7 @@ async function runPracticeTrial() {
 
   const hadError = await playSequence(first, second, third);
   if (hadError) {
-    elements.playbackStatus.textContent = 'Audio could not be loaded. Check the files/network and reload the page.';
+    elements.playbackStatus.textContent = 'Audio load error. Check files/network and reload.';
     return;
   }
   responseWindowStart = performance.now();
@@ -313,7 +327,7 @@ async function runTrial() {
 
   clearFeedback();
   toggleResponseButtons(false);
-  elements.playbackStatus.textContent = 'Playing sounds...';
+  elements.playbackStatus.textContent = 'Playing audio...';
 
   const stepAudio = audioPool[trialStep];
   const first = oddIsThird ? baseAudioA : stepAudio;
@@ -323,7 +337,7 @@ async function runTrial() {
 
   const hadError = await playSequence(first, second, third);
   if (hadError) {
-    elements.playbackStatus.textContent = 'Audio could not be loaded. Check the files/network and reload the page.';
+    elements.playbackStatus.textContent = 'Audio load error. Check files/network and reload.';
     return;
   }
   responseWindowStart = performance.now();
@@ -347,9 +361,14 @@ function handleResponse(choice) {
     practiceState.currentTrial += 1;
     if (practiceState.currentTrial >= practiceConfig.trials) {
       practiceState.completed = true;
-      elements.practiceStatus.textContent = 'Practice complete. You can start the main test.';
+      awaitingTestStart = true;
+      elements.practiceStatus.textContent = 'Practice complete. Press Space or use the button to start the main run.';
       elements.startTest.disabled = false;
+      elements.startTest.textContent = 'Start main run (Space also works)';
+      elements.startPractice.disabled = true;
+      elements.startPractice.textContent = 'Practice completed';
       setTimeout(() => {
+        elements.playbackStatus.textContent = 'Press Space or use the button to start the main run.';
         clearFeedback();
         showSection('instructions');
       }, config.postResponseDelay);
@@ -359,9 +378,8 @@ function handleResponse(choice) {
     return;
   }
 
-  elements.playbackStatus.textContent = wasCorrect
-    ? 'Correct! Preparing the next trial...'
-    : `Incorrect. The correct answer was ${trialState.correctAnswer}. Preparing the next trial...`;
+  elements.playbackStatus.textContent = 'Preparing next trial...';
+  clearFeedback();
   const prevStep = state.currentStep;
 
   const stepSizeUsed = applyStaircase(wasCorrect);
@@ -383,7 +401,6 @@ function handleResponse(choice) {
     mean_reversal_so_far: meanReversal
   });
 
-  setFeedback(wasCorrect ? 'Correct!' : `Incorrect. The correct answer was ${trialState.correctAnswer}.`, wasCorrect);
   state.currentTrial += 1;
   responseWindowStart = null;
   setTimeout(nextTrial, config.postResponseDelay);
@@ -455,8 +472,8 @@ function applyStaircase(wasCorrect) {
 function conclude() {
   const threshold = state.numReversals > 1 ? state.reversalsSum / (state.numReversals - 1) : null;
   elements.thresholdText.textContent = threshold !== null
-    ? `Estimated threshold (mean of reversals): ${threshold.toFixed(2)}`
-    : 'Threshold was not computed because there were not enough reversals.';
+    ? `Estimated threshold (reversal mean): ${threshold.toFixed(2)}`
+    : 'Threshold could not be computed (insufficient reversals).';
   downloadCsv();
   showSection('complete');
 }
@@ -503,7 +520,7 @@ elements.startPractice.addEventListener('click', () => {
 
 elements.startTest.addEventListener('click', () => {
   if (!practiceState.completed) {
-    elements.practiceStatus.textContent = 'Please complete the practice before starting the main test.';
+    elements.practiceStatus.textContent = 'Please finish practice before starting the main run.';
     return;
   }
   startExperiment();
@@ -514,3 +531,10 @@ elements.choose3.addEventListener('click', () => handleResponse('3'));
 elements.downloadCsv.addEventListener('click', downloadCsv);
 
 resetPracticeProgress();
+
+document.addEventListener('keydown', event => {
+  if (event.code === 'Space' && awaitingTestStart) {
+    event.preventDefault();
+    startExperiment();
+  }
+});

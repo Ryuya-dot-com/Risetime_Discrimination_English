@@ -114,8 +114,8 @@
 <body>
   <main>
     <section id="setup" class="card active">
-      <div class="tag">Step 1/4</div>
-      <h1>Rise Time Discrimination Test</h1>
+      <div class="tag">Listening Task 4</div>
+      <h1>Listening Task 4</h1>
       <div class="stack">
         <p>Please enter the participant ID before starting.</p>
         <div>
@@ -127,24 +127,24 @@
     </section>
 
     <section id="instructions" class="card">
-      <div class="tag">Step 2/4</div>
-      <h2>Instructions</h2>
-      <p>In each trial you will hear three sounds. One of them is different from the other two.</p>
-      <p>The odd sound is always either the 1st or the 3rd. Choose which one is different.</p>
-      <p>Start with practice using stimuli 1 and 100 (clearly different) to get used to the procedure and button positions.</p>
-      <p>Feedback is shown after each response. Once you finish the practice, you can start the main test.</p>
+      <div class="tag">Listening Task 4 | Instructions</div>
+      <h2>How this test works</h2>
+      <p>Each trial plays three sounds; one of them differs from the other two.</p>
+      <p>The odd sound is always in position 1 or 3. Choose which one is different.</p>
+      <p>Start with practice using widely spaced stimuli to get used to the procedure.</p>
+      <p>Practice is 5 trials with feedback. When finished, press Space or use the button to begin the main run.</p>
       <div class="button-row">
         <button id="startPractice">Start practice</button>
-        <button id="startTest" disabled>Start main test</button>
+        <button id="startTest" disabled>Start main run (Space also works)</button>
       </div>
-      <p id="practiceStatus" class="status">Please complete the practice first (uses stimuli 1 and 100).</p>
+      <p id="practiceStatus" class="status">After 5 practice trials, start the main run with Space or the button.</p>
     </section>
 
     <section id="trial" class="card">
-      <div class="tag" id="sessionTag">Step 3/4</div>
-      <h2 id="trialHeading">Make your choice</h2>
+      <div class="tag" id="sessionTag">Listening Task 4</div>
+      <h2 id="trialHeading">Listening Task 4</h2>
       <p id="trialPrompt">Which sound is different? (1 or 3)</p>
-      <p id="playbackStatus" class="status">Playing sounds...</p>
+      <p id="playbackStatus" class="status">Playing audio...</p>
       <div class="response-buttons">
         <button id="choose1" data-choice="1" disabled>1</button>
         <button id="choose3" data-choice="3" disabled>3</button>
@@ -155,7 +155,7 @@
     <section id="complete" class="card">
       <div class="tag">Complete</div>
       <h2>Thank you</h2>
-      <p>The test has finished. You can download the results as a CSV file.</p>
+      <p>The test is complete. You can download the results as CSV.</p>
       <p id="thresholdText" class="status"></p>
       <div class="stack">
         <button id="downloadCsv">Download results</button>
